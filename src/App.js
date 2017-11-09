@@ -1,18 +1,76 @@
-import React, { Component } from 'react';
+import React, {
+  Component
+} from 'react';
 import logo from './logo.svg';
 import './App.css';
+import Compose from './components/Compose';
 
 import Toolbar from './components/Toolbar';
 import Messages from './components/Messages'
 
 class App extends Component {
 
-  constructor(props) {
-    super(props)
-    this.state = { messages: props.messages }
+  state = {
+    messages: [],
+    isComposing: false
+  }
+
+  async componentDidMount() {
+    const itemsResponse = await fetch(`/api/messages`)
+    const itemsJson = await itemsResponse.json()
+    console.log(itemsJson)
+    // console.log(itemsJson._embedded)
+    this.setState({
+      ...this.state,
+      messages: itemsJson._embedded.messages
+    })
+  }
+
+  starredMessage = async(message) => {
+
+    const newobj = {
+      messageIds: [message.id],
+      star: !message.starred,
+      command: 'star'
+    }
+
+    const response = await fetch(`/api/messages`, {
+      method: 'PATCH',
+      body: JSON.stringify(newobj),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }
+    })
+
+    if (response.status === 200) {
+      const itemsResponse = await fetch(`/api/messages`)
+      const itemsJson = await itemsResponse.json()
+      console.log(itemsJson)
+
+      let messages = itemsJson._embedded.messages
+
+      let test = itemsJson._embedded.messages[message.id - 1]
+      console.log(test)
+
+      let index = (message.id - 1)
+
+      this.setState({
+        messages: [
+          ...this.state.messages.slice(0, index),
+          {
+            ...test,
+            ['starred']: test.starred
+          },
+          ...this.state.messages.slice(index + 1),
+        ]
+      })
+    }
+
   }
 
   selectedMessage = (message, property) => {
+
     const index = this.state.messages.indexOf(message)
 
     this.setState({
@@ -27,67 +85,191 @@ class App extends Component {
     })
   }
 
-  markAsRead = () => {
-    console.log('test')
-   this.setState({
-     messages: this.state.messages.map(message => (
-       message.selected ? { ...message, read:true } : message
-     ))
-   })
-  }
 
-  markAsUnread = () => {
-    console.log('test')
-   this.setState({
-     messages: this.state.messages.map(message => (
-       message.selected ? { ...message, read: false }: message
-     ))
-   })
-  }
-
-  deleteMessages = () =>{
-    const messages = this.state.messages.filter(message => !message.selected)
-    this.setState({messages})
-  }
-  applyLabel = (label) => {
-    const messages = this.state.messages.map(message => (
-      message.selected && !message.labels.includes(label) ?
-        { ...message, labels: [...message.labels, label].sort() } :
-        message
-    ))
-    this.setState({ messages })
-  }
-  removeLabel = (label) => {
-    const messages = this.state.messages.map(message => {
-      const index = message.labels.indexOf(label)
-      if (message.selected && index > -1) {
-        return {
-          ...message,
-          labels: [
-            ...message.labels.slice(0, index),
-            ...message.labels.slice(index + 1)
-          ]
-        }
-      }
-      return message
+   markAsUnread = async () => {
+    await this.updateMessages({
+      "messageIds": this.state.messages.filter(message => message.selected).map(message => message.id),
+      "command": "read",
+      "read": false
     })
-    this.setState({ messages })
+
+    this.setState({
+      messages: this.state.messages.map(message => (
+        message.selected ? { ...message, read: false } : message
+      ))
+    })
   }
+
+  markAsRead = async () => {
+      await this.updateMessages({
+        "messageIds": this.state.messages.filter(message => message.selected).map(message => message.id),
+        "command": "read",
+        "read": true
+      })
+
+      this.setState({
+        messages: this.state.messages.map(message => (
+          message.selected ? { ...message, read: true } : message
+        ))
+      })
+    }
+
+    applyLabel = async (label) => {
+      await this.updateMessages({
+        "messageIds": this.state.messages.filter(message => message.selected).map(message => message.id),
+        "command": "addLabel",
+        "label": label
+      })
+
+      const messages = this.state.messages.map(message => (
+        message.selected && !message.labels.includes(label) ?
+          { ...message, labels: [...message.labels, label].sort() } :
+          message
+      ))
+      this.setState({ messages })
+    }
+
+    removeLabel = async (label) => {
+      await this.updateMessages({
+        "messageIds": this.state.messages.filter(message => message.selected).map(message => message.id),
+        "command": "removeLabel",
+        "label": label
+      })
+
+      const messages = this.state.messages.map(message => {
+        const index = message.labels.indexOf(label)
+        if (message.selected && index > -1) {
+          return {
+            ...message,
+            labels: [
+              ...message.labels.slice(0, index),
+              ...message.labels.slice(index + 1)
+            ]
+          }
+        }
+        return message
+      })
+      this.setState({ messages })
+    }
   toggleSelectAll = () => {
     const selectedMessages = this.state.messages.filter(message => message.selected)
     const selected = selectedMessages.length !== this.state.messages.length
     this.setState({
       messages: this.state.messages.map(message => (
-        message.selected !== selected ? { ...message, selected } : message
+        message.selected !== selected ? { ...message,
+          selected
+        } : message
       ))
     })
   }
+
+  deleteMessages = () => {
+    const messages = this.state.messages.filter(message => !message.selected)
+    this.setState({
+      messages
+    })
+  }
+
+  toggleCompose = () => {
+    this.setState({
+      isComposing: !this.state.isComposing
+    })
+  }
+
+  createMessage = async(message) => {
+    const response = await fetch(`/api/messages`, {
+      method: 'POST',
+      body: JSON.stringify(message),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }
+    })
+
+    const newMessage = await response.json()
+
+    const messages = [...this.state.messages, newMessage]
+
+    this.setState({
+      messages,
+      isComposing: false,
+    })
+
+  }
+
+  updateMessages = async(payload) => {
+    await this.request('/api/messages', 'PATCH', payload)
+  }
+
+  deleteMessages = async() => {
+    await this.updateMessages({
+      "messageIds": this.state.messages.filter(message => message.selected).map(message => message.id),
+      "command": "delete"
+    })
+
+    const messages = this.state.messages.filter(message => !message.selected)
+    this.setState({
+      messages
+    })
+  }
+
+  async request(path, method = 'GET', body = null) {
+    if (body) body = JSON.stringify(body)
+    return await fetch(`${path}`, {
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: body
+    })
+  }
+
   render() {
-    return (
-      <div className='container'>
-        <Toolbar messages={this.state.messages} toggleSelectAll={ this.toggleSelectAll} applyLabel={ this.applyLabel} removeLabel={ this.removeLabel} markAsRead={ this.markAsRead} markAsUnread = {this.markAsUnread} deleteMessages = {this.deleteMessages} />
-        <Messages messages={ this.state.messages } selectedMessage={ this.selectedMessage }  />
-      </div>
+    return ( <
+      div className = 'container' >
+      <
+      Toolbar toggleCompose = {
+        this.toggleCompose
+      }
+      toggleSelectAll = {
+        this.toggleSelectAll
+      }
+      removeLabel = {
+        this.removeLabel
+      }
+      applyLabel = {
+        this.applyLabel
+      }
+      messages = {
+        this.state.messages
+      }
+      markAsRead = {
+        this.markAsRead
+      }
+      markAsUnread = {
+        this.markAsUnread
+      }
+      deleteMessages = {
+        this.deleteMessages
+      }
+      /> {
+        this.state.isComposing ? < Compose createMessage = {
+          this.createMessage
+        }
+        /> : null
+      } <
+      Messages starredMessage = {
+        this.starredMessage
+      }
+      messages = {
+        this.state.messages
+      }
+      selectedMessage = {
+        this.selectedMessage
+      }
+      /> <
+      /div>
     );
   }
 }

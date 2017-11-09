@@ -1,6 +1,6 @@
 import React from 'react'
 
-const Message = ({message, selectedMessage}) => {
+const Message = ({message, selectedMessage, starredMessage}) => {
 
   function classes() {
     let classes = `row message ${message.read ? 'read' : 'unread'} ${message.selected ? 'selected' : ""}`
@@ -20,7 +20,7 @@ const Message = ({message, selectedMessage}) => {
 
   const starMessage = (e) => {
     e.stopPropagation()
-    selectedMessage(message, 'starred')
+    starredMessage(message)
   }
   return (
     < div onClick={() => selectedMessage(message, 'selected')} className = { classes() } >

@@ -1,6 +1,7 @@
 import React from 'react'
 
-const Toolbar = ({markAsRead, markAsUnread, deleteMessages, messages, applyLabel, removeLabel, toggleSelectAll}) => {
+
+const Toolbar = ({markAsRead, markAsUnread, deleteMessages, messages, applyLabel, removeLabel, toggleSelectAll, toggleCompose}) => {
 
   const unreadCount = messages.filter(message => !message.read).length
   const selectedCount = messages.filter(message => message.selected).length
@@ -27,7 +28,7 @@ const Toolbar = ({markAsRead, markAsUnread, deleteMessages, messages, applyLabel
           unread {unreadCount === 1 ? 'message': 'messages'}
         </p>
 
-        <a className="btn btn-danger">
+        <a onClick={ toggleCompose } className="btn btn-danger">
           <i className="fa fa-plus"></i>
         </a>
 
